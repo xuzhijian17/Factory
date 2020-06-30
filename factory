@@ -1,0 +1,162 @@
+<?php
+error_reporting(E_ALL);
+ini_set("display_errors", 1);
+// 抽象支付类
+abstract class PublicPay {
+	// Declared usable property via	
+	protected $merid;
+	protected $key;
+	protected $payUrl;
+	//protected $payType;
+	protected $returnUrl;
+	protected $notifyUrl;
+	
+	// Declared must property via
+	private $_params;
+	
+	// Abstract method
+    //abstract protected function getSignData(): array; 
+	abstract protected function getPayResult(array $data): array; 
+	abstract protected function returnApiData(array $params): ?array; 
+	
+	public function __construct($params=[]){
+		$this->_params = $params;
+
+		// from mysql db
+		$model_name = 'Wuji';
+		$this->merid = '12';
+		$this->key = '123456';	
+		$this->payUrl = 'http://xxx';
+		$this->notifyUrl = 'http://xxx/'.$model_name;
+	}
+	
+	// 子类可通过该方法获取参数中的payType字段
+	public function get_payType() {
+		if(!isset($this->_params['payType'])){
+			throw new Exception("Undefined property via `payType`", 1);
+		}
+		
+        return $this->_params['payType'];
+    }
+	
+	// Common method
+	protected function curl_request($data) {
+		// do something
+        return $data;
+    }
+	
+	protected function form_request($data) {
+		// do something
+        return $data;
+    }
+	
+	// 构建curl请求返回结果是json
+	protected function buildWap($data) {
+		// do something
+        return $data;
+    }
+	
+	// 构建form表单请求返回结果是html
+	protected function buildForm($data) {
+		// do something
+        return $data;
+    }
+	
+	public function __get($name)
+    {
+        if (array_key_exists($name, $this->_params)) {
+            return $this->_params[$name];
+        }
+
+        $trace = debug_backtrace();
+        trigger_error(
+            'Undefined property via __get(): ' . $name .
+            ' in ' . $trace[0]['file'] .
+            ' on line ' . $trace[0]['line'],
+            E_USER_NOTICE);
+        return null;
+    }
+	
+	public function __call($name, $arguments)
+    {
+		$method = strstr($name,'_',true);
+		$property= strstr($name,'_');
+
+		if($method == 'set'){
+			$this->$property =  count($arguments) > 1 ? $arguments : $arguments[0];
+		}elseif($method == 'get'){
+			if(!isset($this->$property)){
+				exit("Undefined property via: '$name'\n");
+			}
+			return $this->$property;
+		}else{
+			exit("Calling object method '$name'\n");
+		}
+    }
+	
+}
+// 具体支付类
+class Wuji extends PublicPay {
+	//protected $callback_fun = 'Wuji';
+
+    public function getSignData(): array {
+		
+		$data['merid'] = $this->merid;
+		$data['money'] = $this->money;
+		$data['order'] = $this->order;
+		$data['pay_type'] = $this->get_payType();
+        $data['pay_url'] = $this->payUrl;
+		$data['returnUrl'] = $this->returnUrl;
+		$data['notifyUrl'] = $this->notifyUrl;
+		ksort($data);
+
+        return $data;
+	}
+	
+	public function getPayResult($data): array
+    {
+		var_dump($this,$this->order);
+		// do something
+		return $this->form_request($data);
+    }
+	
+	public function returnApiData($params=[]): ?array {
+		// 构造签名参数
+        $data = $this->getSignData();
+        $sign_data = http_build_query($data).'&'.$this->key;
+		// 无需签名参数
+        $data['sign'] = md5($sign_data);
+        $data['ip'] = '127.0.0.1';
+		
+		// 构建返回数据
+		$pay_result = $this->getPayResult($data);
+		
+		// 构建第三方接口对应返回的数据	buildWap----curl请求返回json buildForm----form表单提交返回HTML
+        return $this->buildForm($pay_result);
+    }
+}
+
+// 定义工厂接口类
+interface Factory {
+	public function create($model_name,$params);
+}
+// 实现工作接口类
+class PayFactory implements Factory {
+    public function create($model_name,$params) {
+		//if (!file_exists($model_name) || !is_readable($model_name)) {
+			//exit('Include file does not exists or is not readable.');
+		//}
+		
+		//require_once($model_name);
+		return new $model_name($params);
+    }
+}
+
+$order = '111111111111';
+$money = 0.01;
+$payType = 1;
+$params = ['order'=>$order,'money'=>$money,'payType'=>$payType];
+$pay_factory = new PayFactory();
+$rs = $pay_factory->create('Wuji',$params)->returnApiData();
+var_dump($rs);
+
